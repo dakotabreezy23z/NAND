@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAND</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: monospace;
+    background: #0a100a;
+    color: #c9d1d9;
+    min-height: 100vh;
+    background-image:
+      linear-gradient(rgba(0,255,100,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,100,0.025) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .app { padding: 20px 16px 60px; }
+
+  /* HEADER */
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+    border-bottom: 1px solid #00ff6618;
+    padding-bottom: 18px;
+  }
+  .header h1 {
+    font-size: 22px;
+    color: #00ff88;
+    letter-spacing: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .header p {
+    font-size: 11px;
+    color: #2a5a3a;
+    margin-top: 5px;
+    letter-spacing: 2px;
+  }
+
+  /* HOME GRID */
+  #homeView { max-width: 860px; margin: 0 auto; }
+  .gate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 12px;
+  }
+  .gate-card {
+    background: #0d150d;
+    border: 1px solid #1a2a1a;
+    border-top-width: 2px;
+    border-radius: 8px;
+    padding: 14px 12px 20px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .gate-card:hover, .gate-card:active {
+    background: #111a11;
+  }
+  .gate-card-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .gate-card-desc {
+    font-size: 11px;
+    color: #3a6a4a;
+    line-height: 1.5;
+  }
+  .gate-card-sym {
+    position: absolute;
+    bottom: 8px;
+    right: 10px;
+    font-size: 20px;
+    opacity: 0.15;
+    transition: opacity 0.2s;
+  }
+  .gate-card:hover .gate-card-sym { opacity: 0.3; }
+
+  /* DETAIL VIEW */
+  #detailView { max-width: 680px; margin: 0 auto; display: none; }
+  #detailView.active { display: block; }
+
+  .back-btn {
+    background: transparent;
+    border: 1px solid #1a3a1a;
+    color: #3a7a4a;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 4px;
+    margin-bottom: 22px;
+    letter-spacing: 1px;
+    -webkit-tap-highlight-color: transparent;
+    display: inline-block;
+  }
+  .back-btn:active { color: #00ff88; border-color: #00ff6644; }
+
+  .detail-name {
+    font-size: 26px;
+    letter-spacing: 2px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .detail-tagline {
+    font-size: 12px;
+    color: #2a5a3a;
+    margin-bottom: 18px;
+  }
+  .detail-desc {
+    font-size: 13px;
+    color: #6a9a7a;
+    line-height: 1.75;
+    margin-bottom: 18px;
+    border-left: 2px solid #00ff8833;
+    padding-left: 14px;
+  }
+  .real-world {
+    background: #080f08;
+    border: 1px solid #0a2a0a;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 24px;
+    font-size: 12px;
+    color: #3a7a4a;
+    line-height: 1.7;
+  }
+  .real-world strong { color: #00cc66; }
+
+  .diagram-wrap {
+    background: #080f08;
+    border: 1px solid #0a200a;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .section-label {
+    font-size: 10px;
+    color: #1a4a2a;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* SVG diagram */
+  #diagramSvg { width: 100%; display: block; }
+
+  .input-light { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+  @keyframes flowDash { to { stroke-dashoffset: -10; } }
+  .live-wire {
+    stroke-dasharray: 6 4;
+    animation: flowDash 0.5s linear infinite;
+  }
+
+  /* TRUTH TABLE */
+  .truth-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-family: monospace;
+  }
+  .truth-table th {
+    border-bottom: 1px solid #1a3a1a;
+    padding: 8px 0;
+    text-align: center;
+    font-weight: 400;
+    letter-spacing: 1px;
+  }
+  .truth-table td {
+    padding: 8px 0;
+    text-align: center;
+    border-bottom: 1px solid #0d1f0d;
+    transition: background 0.15s;
+  }
+  .truth-table tr.active-row td { background: #0a2210; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>⬡ Logic Gates</h1>
+    <p id="headerSub">interactive digital logic explorer — tap any gate</p>
+  </div>
+
+  <!-- HOME VIEW -->
+  <div id="homeView">
+    <div class="gate-grid" id="gateGrid"></div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div id="detailView">
+    <button class="back-btn" onclick="goHome()">← back to gates</button>
+    <div class="detail-name" id="dName"></div>
+    <div class="detail-tagline" id="dTagline"></div>
+    <p class="detail-desc" id="dDesc"></p>
+    <div class="real-world" id="dReal"></div>
+    <div class="diagram-wrap">
+      <div class="section-label">tap the input lights to toggle</div>
+      <svg id="diagramSvg" viewBox="0 0 420 160"></svg>
+    </div>
+    <div class="section-label" style="margin-bottom:8px">truth table</div>
+    <table class="truth-table" id="truthTable"></table>
+  </div>
+
+</div>
+
+<script>
+const GATES = [
+  {
+    id:"AND", symbol:"⊓", accent:"#00ff88",
+    tagline:"All inputs must be HIGH for output to be HIGH",
+    desc:"The AND gate outputs 1 only when every input is 1. Think of it like a series circuit — every switch must be closed for current to flow. It embodies strict logical conjunction: A AND B must both be true simultaneously.",
+    real:"Real world: A car's engine start system — the seatbelt sensor AND the brake pedal AND the ignition key must all be active before the engine is allowed to crank.",
+    inputs:["A","B"],
+    logic:ins=>ins.every(v=>v)?1:0,
+    rows:[[0,0,0],[0,1,0],[1,0,0],[1,1,1]],
+    invert:false
+  },
+  {
+    id:"OR", symbol:"∪", accent:"#00ccff",
+    tagline:"Any input HIGH is enough for output HIGH",
+    desc:"The OR gate outputs 1 if at least one of its inputs is 1. Only all-zero inputs give a zero output. It models 'any one condition is sufficient' logic — like a parallel circuit where any switch can complete the path.",
+    real:"Real world: A home alarm system — triggered if the front door OR a window sensor is activated. Any single breach sounds the alarm.",
+    inputs:["A","B"],
+    logic:ins=>ins.some(v=>v)?1:0,
+    rows:[[0,0,0],[0,1,1],[1,0,1],[1,1,1]],
+    invert:false
+  },
+  {
+    id:"NOT", symbol:"¬", accent:"#ffcc00",
+    tagline:"Inverts its single input — the inverter",
+    desc:"The NOT gate flips its input: 1 becomes 0, 0 becomes 1. The simplest gate with just one input and one output. Every digital system needs inversion to create complementary logic and enable feedback loops.",
+    real:"Real world: A night-light sensor — when ambient light is HIGH (daytime), the lamp stays OFF. When it's LOW (dark), the output goes HIGH and switches the lamp on.",
+    inputs:["A"],
+    logic:ins=>ins[0]?0:1,
+    rows:[[0,1],[1,0]],
+    invert:true
+  },
+  {
+    id:"NAND", symbol:"⊼", accent:"#ff5577",
+    tagline:"NOT-AND — the universal building block",
+    desc:"NAND is the inverted AND — outputs 0 only when all inputs are 1, and 1 in every other case. Called a 'universal gate' because any other gate type can be built entirely from NANDs. They are the most common gate in real chips.",
+    real:"Real world: CPU chip design — nearly all modern processor logic is built from NAND gates because they are cheaper, faster, and use less power than separate AND and NOT gate combinations.",
+    inputs:["A","B"],
+    logic:ins=>ins.every(v=>v)?0:1,
+    rows:[[0,0,1],[0,1,1],[1,0,1],[1,1,0]],
+    invert:true
+  },
+  {
+    id:"NOR", symbol:"⊽", accent:"#aa77ff",
+    tagline:"NOT-OR — also a universal gate",
+    desc:"NOR outputs 1 only when ALL inputs are 0. Any active input drives the output low. Like NAND, NOR is a universal gate — all other logic gates can be constructed from NOR gates alone.",
+    real:"Real world: Safety lockout systems — a machine operates only if no emergency stop buttons are pressed. Any button pressed shuts it down (the inverted OR output goes low).",
+    inputs:["A","B"],
+    logic:ins=>ins.some(v=>v)?0:1,
+    rows:[[0,0,1],[0,1,0],[1,0,0],[1,1,0]],
+    invert:true
+  },
+  {
+    id:"XOR", symbol:"⊕", accent:"#ff8833",
+    tagline:"Inputs must DIFFER for output to be HIGH",
+    desc:"XOR (Exclusive OR) outputs 1 only when its inputs are different. Same inputs give 0. It detects 'difference' and is fundamental in binary arithmetic and cryptography. XOR is reversible: applying it twice returns the original value.",
+    real:"Real world: Binary addition — the XOR gate computes the sum bit when adding two single binary digits. It is the core of every digital adder and therefore every ALU (Arithmetic Logic Unit) in computing.",
+    inputs:["A","B"],
+    logic:ins=>ins[0]!==ins[1]?1:0,
+    rows:[[0,0,0],[0,1,1],[1,0,1],[1,1,0]],
+    invert:false
+  },
+  {
+    id:"XNOR", symbol:"⊙", accent:"#ff44bb",
+    tagline:"Inputs must MATCH for output to be HIGH",
+    desc:"XNOR is the inverse of XOR — outputs 1 when both inputs are equal. Known as an 'equivalence detector.' Same inputs give 1, different inputs give 0. Widely used for comparison and parity checking circuits.",
+    real:"Real world: Data verification — comparing two bitstreams to check they are identical. Each bit pair passes through XNOR; all 1s in the output confirms a perfect match.",
+    inputs:["A","B"],
+    logic:ins=>ins[0]===ins[1]?1:0,
+    rows:[[0,0,1],[0,1,0],[1,0,0],[1,1,1]],
+    invert:true
+  },
+  {
+    id:"BUFFER", symbol:"▷", accent:"#44ffcc",
+    tagline:"Passes signal unchanged — signal amplifier",
+    desc:"The BUFFER outputs exactly what it receives — no inversion, no logic change. Its purpose is to boost signal strength (drive more current), introduce intentional timing delay, or electrically isolate sections of a circuit without changing the logic value.",
+    real:"Real world: Long PCB traces — when a signal must travel far on a circuit board and drive many downstream components, a buffer amplifies the current so the signal does not degrade or arrive too late.",
+    inputs:["A"],
+    logic:ins=>ins[0],
+    rows:[[0,0],[1,1]],
+    invert:false
+  },
+  {
+    id:"AND3", symbol:"⊓₃", accent:"#00ff88",
+    tagline:"All THREE inputs must be HIGH",
+    desc:"A 3-input AND gate extends AND logic to three inputs. All three must be 1 simultaneously for the output to be 1. Used when three independent conditions must all hold before an action is triggered. Has 8 possible input combinations (2³).",
+    real:"Real world: Rocket launch authorization — fuel level HIGH AND systems-check PASS AND commander ARMED must all be true simultaneously before the ignition sequence is permitted.",
+    inputs:["A","B","C"],
+    logic:ins=>ins.every(v=>v)?1:0,
+    rows:[[0,0,0,0],[0,0,1,0],[0,1,0,0],[0,1,1,0],[1,0,0,0],[1,0,1,0],[1,1,0,0],[1,1,1,1]],
+    invert:false
+  },
+  {
+    id:"OR3", symbol:"∪₃", accent:"#00ccff",
+    tagline:"Any ONE of three inputs HIGH is enough",
+    desc:"A 3-input OR gate outputs 1 if any of its three inputs is 1. Only the all-zero case gives a 0 output. Ideal for 'any one of these triggers an action' logic across three independent signal sources.",
+    real:"Real world: Hospital alert system — any of three patient monitoring sensors (heart rate, blood pressure, oxygen level) going critical triggers the nurse call alarm immediately.",
+    inputs:["A","B","C"],
+    logic:ins=>ins.some(v=>v)?1:0,
+    rows:[[0,0,0,0],[0,0,1,1],[0,1,0,1],[0,1,1,1],[1,0,0,1],[1,0,1,1],[1,1,0,1],[1,1,1,1]],
+    invert:false
+  },
+  {
+    id:"NAND3", symbol:"⊼₃", accent:"#ff5577",
+    tagline:"Only all-THREE-HIGH gives LOW output",
+    desc:"The 3-input NAND gate outputs 0 only when all three inputs are 1. In all other 7 of 8 combinations it outputs 1. Combines the universality of NAND with the ability to gate three conditions simultaneously.",
+    real:"Real world: Triple-authentication door lock — only when badge, PIN, AND biometric scan are all valid does the NAND output drop to 0 and trigger the active-low unlock circuit.",
+    inputs:["A","B","C"],
+    logic:ins=>ins.every(v=>v)?0:1,
+    rows:[[0,0,0,1],[0,0,1,1],[0,1,0,1],[0,1,1,1],[1,0,0,1],[1,0,1,1],[1,1,0,1],[1,1,1,0]],
+    invert:true
+  },
+  {
+    id:"NOR3", symbol:"⊽₃", accent:"#aa77ff",
+    tagline:"Only all-THREE-LOW gives HIGH output",
+    desc:"A 3-input NOR gate outputs 1 only when all three inputs are 0. Any single input going high drives the output low. Used to detect a complete absence of any active signal across three independent inputs.",
+    real:"Real world: Deep sleep mode controller — a device enters ultra-low-power standby only when motion sensor, button press, AND network activity are ALL absent. Any activity keeps it awake.",
+    inputs:["A","B","C"],
+    logic:ins=>ins.some(v=>v)?0:1,
+    rows:[[0,0,0,1],[0,0,1,0],[0,1,0,0],[0,1,1,0],[1,0,0,0],[1,0,1,0],[1,1,0,0],[1,1,1,0]],
+    invert:true
+  }
+];
+
+// ---- State ----
+let currentGate = null;
+let inputState = [];
+
+// ---- Home ----
+function buildHome() {
+  const grid = document.getElementById('gateGrid');
+  grid.innerHTML = GATES.map(g => `
+    <div class="gate-card" style="border-top-color:${g.accent}" onclick="openGate('${g.id}')">
+      <div class="gate-card-name" style="color:${g.accent}">${g.id}</div>
+      <div class="gate-card-desc">${g.tagline}</div>
+      <div class="gate-card-sym" style="color:${g.accent}">${g.symbol}</div>
+    </div>
+  `).join('');
+}
+
+function goHome() {
+  currentGate = null;
+  document.getElementById('homeView').style.display = '';
+  document.getElementById('detailView').classList.remove('active');
+  document.getElementById('headerSub').textContent = 'interactive digital logic explorer — tap any gate';
+}
+
+// ---- Detail ----
+function openGate(id) {
+  const gate = GATES.find(g => g.id === id);
+  if (!gate) return;
+  currentGate = gate;
+  inputState = gate.inputs.map(() => 0);
+
+  document.getElementById('homeView').style.display = 'none';
+  document.getElementById('detailView').classList.add('active');
+  document.getElementById('headerSub').textContent = gate.id + ' gate — tap inputs to toggle';
+
+  document.getElementById('dName').textContent = gate.id + ' Gate';
+  document.getElementById('dName').style.color = gate.accent;
+  document.getElementById('dTagline').textContent = gate.tagline;
+  document.getElementById('dDesc').textContent = gate.desc;
+  document.getElementById('dReal').innerHTML = '<strong>' + gate.real.replace('Real world:', 'Real world:') + '</strong>'.replace('<strong>Real world:</strong>', '<strong>Real world:</strong> ').replace('<strong>', '').replace('</strong>', '');
+  document.getElementById('dReal').innerHTML = gate.real.replace('Real world:', '<strong>Real world:</strong>');
+
+  renderDiagram();
+  renderTable();
+}
+
+function toggleInput(i) {
+  inputState[i] = inputState[i] === 0 ? 1 : 0;
+  renderDiagram();
+  renderTable();
+}
+
+// ---- SVG Diagram ----
+function renderDiagram() {
+  const gate = currentGate;
+  const acc = gate.accent;
+  const n = gate.inputs.length;
+  const svgH = n === 3 ? 200 : 160;
+  const svgW = 420;
+
+  const svg = document.getElementById('diagramSvg');
+  svg.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+
+  const inputYs = n === 1 ? [svgH/2]
+    : n === 2 ? [svgH*0.33, svgH*0.67]
+    : [svgH*0.2, svgH*0.5, svgH*0.8];
+
+  const midY = svgH / 2;
+  const gateX = 128, gateW = 104;
+  const gateTop = inputYs[0] - 28;
+  const gateBot = inputYs[n-1] + 28;
+  const gateH = gateBot - gateTop;
+  const output = gate.logic(inputState);
+  const liveOut = output === 1;
+
+  let html = `<style>
+    @keyframes fd{to{stroke-dashoffset:-10}}
+    .lw{stroke-dasharray:6 4;animation:fd .5s linear infinite}
+  </style>`;
+
+  // Input lights + wires
+  inputYs.forEach((y, i) => {
+    const live = inputState[i] === 1;
+    const col = live ? acc : '#0f1f0f';
+    const shadow = live ? `filter:drop-shadow(0 0 8px ${acc}cc)` : '';
+    const wireCol = live ? acc : '#1e3a1e';
+    const wireFilter = live ? `filter:drop-shadow(0 0 3px ${acc}44)` : '';
+    const wClass = live ? 'lw' : '';
+
+    html += `
+      <g class="input-light" onclick="toggleInput(${i})" style="cursor:pointer;-webkit-tap-highlight-color:transparent">
+        <circle cx="36" cy="${y}" r="18" fill="#0a140a" stroke="#1e3a1e" stroke-width="1"/>
+        <circle cx="36" cy="${y}" r="11" fill="${col}" style="${shadow};transition:fill .15s"/>
+        <text x="36" y="${y+4}" text-anchor="middle" style="font-size:10px;fill:${live?'#000':'#2a5a2a'};font-family:monospace;font-weight:700;pointer-events:none">${inputState[i]}</text>
+        <text x="36" y="${y-23}" text-anchor="middle" style="font-size:11px;fill:#2a5a3a;font-family:monospace">${gate.inputs[i]}</text>
+        <line x1="55" y1="${y}" x2="${gateX}" y2="${y}" stroke="${wireCol}" stroke-width="2" class="${wClass}" style="${wireFilter}"/>
+      </g>`;
+  });
+
+  // Gate box
+  html += `<rect x="${gateX}" y="${gateTop}" width="${gateW}" height="${gateH}" rx="7" fill="#0d1a0d" stroke="${acc}44" stroke-width="1.5"/>
+    <text x="${gateX + gateW/2}" y="${midY+5}" text-anchor="middle" style="font-size:14px;fill:${acc};font-family:monospace;font-weight:600">${gate.id}</text>`;
+
+  // Invert bubble
+  const bubX = gateX + gateW + 8;
+  if (gate.invert) {
+    html += `<circle cx="${bubX}" cy="${midY}" r="7" fill="#0a140a" stroke="${acc}88" stroke-width="1.5"/>`;
+  }
+
+  // Output wire
+  const wireStartX = gate.invert ? bubX + 7 : gateX + gateW;
+  const outLightX = 370;
+  const outWireCol = liveOut ? acc : '#1e3a1e';
+  const outWireFilter = liveOut ? `filter:drop-shadow(0 0 3px ${acc}44)` : '';
+  const outWClass = liveOut ? 'lw' : '';
+  html += `<line x1="${wireStartX}" y1="${midY}" x2="${outLightX - 18}" y2="${midY}" stroke="${outWireCol}" stroke-width="2.5" class="${outWClass}" style="${outWireFilter}"/>`;
+
+  // Output light
+  const outCol = liveOut ? acc : '#0f1f0f';
+  const outShadow = liveOut ? `filter:drop-shadow(0 0 12px ${acc}dd)` : '';
+  html += `
+    <circle cx="${outLightX}" cy="${midY}" r="20" fill="#0a140a" stroke="#1e3a1e" stroke-width="1"/>
+    <circle cx="${outLightX}" cy="${midY}" r="13" fill="${outCol}" style="${outShadow};transition:fill .2s"/>
+    <text x="${outLightX}" y="${midY+5}" text-anchor="middle" style="font-size:12px;fill:${liveOut?'#000':'#2a5a2a'};font-family:monospace;font-weight:700;pointer-events:none">${output}</text>
+    <text x="${outLightX}" y="${midY+38}" text-anchor="middle" style="font-size:10px;fill:#2a5a3a;font-family:monospace">OUT</text>`;
+
+  svg.innerHTML = html;
+}
+
+// ---- Truth Table ----
+function renderTable() {
+  const gate = currentGate;
+  const acc = gate.accent;
+  const headers = [...gate.inputs, 'OUT'];
+  let html = '<thead><tr>' + headers.map(h =>
+    `<th style="color:${acc}">${h}</th>`
+  ).join('') + '</tr></thead><tbody>';
+
+  gate.rows.forEach(row => {
+    const isActive = gate.inputs.every((_, i) => row[i] === inputState[i]);
+    const cls = isActive ? ' class="active-row"' : '';
+    html += `<tr${cls}>` + row.map((v, ci) => {
+      const isOut = ci === row.length - 1;
+      let color;
+      if (v === 1) color = isOut ? acc : '#4aaa6a';
+      else color = '#2a4a2a';
+      return `<td style="color:${color};font-weight:${isActive?600:400}">${v}</td>`;
+    }).join('') + '</tr>';
+  });
+
+  html += '</tbody>';
+  document.getElementById('truthTable').innerHTML = html;
+}
+
+// ---- Init ----
+buildHome();
+</script>
+</body>
+</html>
